@@ -17,3 +17,7 @@ Math.sign = function(value)
     return -1;
 }
 
+Math.choice = function(array)
+{
+    return array[Math.floor(Math.random() * array.length)];
+}

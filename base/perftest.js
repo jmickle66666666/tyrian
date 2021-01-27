@@ -6,15 +6,83 @@ let PerfTest = {
         camera.orthoScale = 11/3;
         // this.addSprites();
 
+        let tileset = [
+            0, 1, 2, 3, 4, 5,
+            8, 9, 10, 11, 12,
+            16, 17, 18, 19, 20
+        ];
+
+        let tileNeighbors = {};
+        tileNeighbors[0] = { r: [ 0, 2, 10, 18, ], u: [ 0, 18, 19, 20, ] };
+        tileNeighbors[1] = { r: [ 1, 9, 11, 12, 17 ], u: [ 1, 3, 8, 9, 11 ] };
+        tileNeighbors[2] = { r: [ 3, 4, 8, ], u: tileNeighbors[0].u };
+        tileNeighbors[3] = { r: tileNeighbors[2].r, u: tileNeighbors[0].u };
+        tileNeighbors[4] = { r: tileNeighbors[0].r, u: tileNeighbors[0].u };
+
+        tileNeighbors[8] = { r: tileNeighbors[1].r, u: [ 2, 10, 16, ] };
+        tileNeighbors[9] = { r: tileNeighbors[2].r, u: [ 4, 12, 17, ] };
+        tileNeighbors[10] = { r: tileNeighbors[1].r, u: tileNeighbors[8].u };
+        tileNeighbors[11] = { r: tileNeighbors[1].r, u: tileNeighbors[1].u };
+        tileNeighbors[12] = { r: tileNeighbors[0].r, u: tileNeighbors[9].u };
+
+        tileNeighbors[16] = { r: tileNeighbors[1].r, u: tileNeighbors[1].u };
+        tileNeighbors[17] = { r: [ 16, 19, 20, ], u: tileNeighbors[1].u };
+        tileNeighbors[18] = { r: tileNeighbors[17].r, u: tileNeighbors[8].u };
+        tileNeighbors[19] = { r: tileNeighbors[17].r, u: tileNeighbors[1].u };
+        tileNeighbors[20] = { r: tileNeighbors[0].r, u: tileNeighbors[9].u };
         
         for (let i = 0; i < this.tileWidth; i++)
         {
             let curRow = [];
             for (let j = 0; j < this.tileHeight; j++)
             {
-                curRow.push(Math.random() < 0.5?1: 0);
+                curRow.push(-1);
             }
             this.tiles.push(curRow);
+        }
+
+        for (let j = 0; j < this.tileHeight; j++)
+        {
+            for (let i = 0; i < this.tileWidth; i++)
+            {
+                if (i == 0 && j == 0) {
+                    this.tiles[i][j] = Math.choice([0, 1]);
+                } else {
+                
+                    let possibilities = tileset;
+
+                    if (i != 0) {
+                        // Console.log(this.tiles[i - 1][j]);/
+                        let options = tileNeighbors[this.tiles[i - 1][j]].r;
+                        let newPoss = [];
+                        for (var o in options) {
+                            if (possibilities.indexOf(options[o]) != -1) {
+                                newPoss.push(options[o]);
+                            }
+                        }
+                        possibilities = newPoss;
+                    }
+
+                    if (j != 0) {
+                        let options = tileNeighbors[this.tiles[i][j - 1]].u;
+                        let newPoss = [];
+                        for (var o in options) {
+                            if (possibilities.indexOf(options[o]) != -1) {
+                                newPoss.push(options[o]);
+                            }
+                        }
+                        possibilities = newPoss;
+                    }
+
+                    if (possibilities.length > 0) {
+                        this.tiles[i][j] = Math.choice(possibilities);
+                    } else {
+                        Console.log("no possibilities");
+                        this.tiles[i][j] = 0;
+                    }
+
+                }
+            }
         }
 
         // this.buildBackgroundMesh();
@@ -31,7 +99,16 @@ let PerfTest = {
         this.drawbackground();
         this.playerUpdate();
         this.bulletUpdate();
-        Draw.texturePart(this.px - 16, this.py - 16, "sprites/sprites", 16, 96, 32, 32);
+
+        let frame = 96;
+        if (Input.Get[Key.Left] && !Input.Get[Key.Right]) {
+            frame -= 64;
+        }
+
+        if (!Input.Get[Key.Left] && Input.Get[Key.Right]) {
+            frame -= 32;
+        }
+        Draw.texturePart(this.px - 16, this.py - 16, "sprites/sprites", 16, frame, 32, 32);
 
         // for (let i = 0; i < this.sprites.length; i++)
         // {
@@ -48,7 +125,7 @@ let PerfTest = {
         if (Input.GetDown[Key.R]) System.reset();
         if (Input.GetDown[Key.Escape]) loadScene(MainMenu);
 
-        Draw.text(0, 0, 0, dt);
+        // Draw.text(0, 0, 0, dt);
     },
 
     px : 160,
@@ -92,7 +169,7 @@ let PerfTest = {
                 this.bullets[i].x - 8, 
                 this.bullets[i].y - 8, 
                 "sprites/sprites", 
-                0, 112-16, 16, 16
+                0, 112-32, 16, 16
             );
         }
 
@@ -114,17 +191,24 @@ let PerfTest = {
     // },
 
     tileWidth : 14,
-    tileHeight : 10,
+    tileHeight : 25,
     tiles : [],
     mesh : null,
+    tileSpeed : 2,
 
     drawbackground:function() {
+        let tStart = Math.floor(this.time * this.tileSpeed);
         for (let i = 0; i < this.tileWidth; i++)
         {
-            for (let j = 0; j < this.tileHeight; j++)
+            for (let j = tStart; j < Math.min(this.tileHeight + tStart - 14, this.tileHeight); j++)
             {
+                let tileCoords = {
+                    x: (this.tiles[i][j] % 8) * 24,
+                    y: Math.floor(this.tiles[i][j] / 8) * 24
+                };
+                tileCoords.y = (192-24) - tileCoords.y;
                 Draw.texturePart(
-                    i * 24, j * 24, "sprites/tiles", this.tiles[i][j]==1?24:0, 168, 24, 24
+                    i * 24, Math.round(-this.time*24 * this.tileSpeed + (j * 24)), "sprites/tiles", tileCoords.x, tileCoords.y, 24, 24
                 );
             }
         }
